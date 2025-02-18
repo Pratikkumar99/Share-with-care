@@ -148,6 +148,7 @@
           <div class="card listing-card position-relative">
             <div class="condition-indicator condition-${listing.condition}"></div>
             <div class="card-body">
+              ${listing.photo ? `<img src="${listing.photo}" class="card-img-top mb-3" alt="${listing.foodType}" style="height: 400px; background-size : contain; background-repeat : no-repeat;">` : ''}
               <h5 class="card-title text-primary">${listing.foodType}</h5>
               <div class="card-text">
                 <div class="mb-2">
