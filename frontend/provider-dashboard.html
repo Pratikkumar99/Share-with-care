@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Provider Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #2c3e50;
+      --secondary-color: #3498db;
+    }
+    .food-card {
+      transition: transform 0.2s;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+    .food-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .condition-indicator {
+      width: 10px;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      border-radius: 8px 0 0 8px;
+    }
+    .condition-fresh { background-color: #2ecc71; }
+    .condition-expiring { background-color: #f1c40f; }
+    .condition-urgent { background-color: #e74c3c; }
+    .chart-container {
+      background: white;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="#">
+        <i class="fas fa-utensils me-2"></i>ShareWithCare
+      </a>
+      <button class="btn btn-light" id="logoutBtn">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <!-- Add Food Section -->
+    <div class="card mb-4 shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title mb-4 text-primary">
+          <i class="fas fa-plus-circle me-2"></i>Add New Food Listing
+        </h4>
+        <form id="addFoodForm">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Food Photo</label>
+                <input type="file" class="form-control" id="foodPhoto" accept="image/*" required>
+              </div>
+            <div class="col-md-3">
+              <label class="form-label">Food Type</label>
+              <input type="text" class="form-control" id="foodType" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Quantity</label>
+              <input type="text" class="form-control" id="quantity" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Location</label>
+              <input type="text" class="form-control" id="location" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Time</label>
+              <input type="datetime-local" class="form-control" id="expiry" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Price (₹)</label>
+              <input type="number" class="form-control" id="price" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Condition</label>
+                <select class="form-select" id="foodCondition" required>
+                    <option value="fresh">Fresh</option>
+                    <option value="frozen">Frozen</option>
+                    <option value="expiring">Expiring</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-success w-100">
+                <i class="fas fa-plus me-2"></i>Add
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Active Listings -->
+    <h4 class="mb-3 text-primary">
+      <i class="fas fa-list-ul me-2"></i>Active Listings
+    </h4>
+    <div id="loadingSpinner" class="text-center my-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+    <div id="providerListings" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"></div>
+    <div id="errorMessage" class="alert alert-danger mt-3 d-none"></div>
+  </div>
+
+  <script>
+    const Base_URL = "http://localhost:4000";
+
+    // DOM Elements
+    const listingsContainer = document.getElementById('providerListings');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const errorMessage = document.getElementById('errorMessage');
+
+    // Format date function
+    const formatDate = (dateString) => {
+      const options = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      };
+      return new Date(dateString).toLocaleDateString('en-IN', options);
+    };
+
+    // Fetch provider's listings with error handling
+    const fetchProviderListings = async () => {
+      try {
+        loadingSpinner.classList.remove('d-none');
+        errorMessage.classList.add('d-none');
+        
+        const response = await fetch(`${Base_URL}/food/provider`, {
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem("Token")}` 
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const listings = await response.json();
+        renderProviderListings(listings);
+      } catch (error) {
+        console.error('Fetch error:', error);
+        errorMessage.textContent = `Failed to load listings: ${error.message}`;
+        errorMessage.classList.remove('d-none');
+      } finally {
+        loadingSpinner.classList.add('d-none');
+      }
+    };
+
+    // Render listings with proper error handling
+    const renderProviderListings = (listings) => {
+  listingsContainer.innerHTML = listings.map(listing => `
+    <div class="col">
+      <div class="card food-card h-100 position-relative">
+        <div class="condition-indicator condition-${listing.condition}"></div>
+        <div class="card-body">
+          ${listing.photo ? `<img src="${listing.photo}" class="card-img-top mb-3" alt="${listing.foodType}" style="height: 400px; background-size : contain; background-repeat : no-repeat;">` : ''}
+          <h5 class="card-title text-primary">${listing.foodType}</h5>
+          <div class="card-text">
+            <div class="mb-2">
+              <i class="fas fa-weight-hanging me-2"></i>
+              <strong>Quantity:</strong> ${listing.quantity}
+            </div>
+            <div class="mb-2">
+              <i class="${getConditionIcon(listing.condition)}"></i>
+              ${listing.condition.charAt(0).toUpperCase() + listing.condition.slice(1)}
+            </div>
+            <div class="mb-2">
+              <i class="fas fa-map-marker-alt me-2"></i>
+              <strong>Location:</strong> ${listing.location}
+            </div>
+            <div class="mb-2">
+              <i class="fas fa-clock me-2"></i>
+              <strong>Time:</strong> ${formatDate(listing.expiry)}
+            </div>
+            <div class="mb-3">
+              <i class="fas fa-rupee-sign me-2"></i>
+              <strong>Price:</strong> ₹${listing.price}
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="badge ${listing.status === "available" ? "bg-success" : "bg-secondary"}">
+                ${listing.status}
+              </span>
+              <button onclick="deleteListing('${listing._id}')" class="btn btn-danger btn-sm">
+                <i class="fas fa-trash me-1"></i>Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+};
+        function getConditionIcon(condition) {
+            switch (condition) {
+                case "fresh": return "fas fa-leaf text-success"; // Green
+                case "frozen": return "fas fa-snowflake text-primary"; // Blue
+                case "expiring": return "fas fa-exclamation-triangle text-warning"; // Yellow
+                default: return "fas fa-question-circle text-secondary"; // Gray (Unknown)
+            }
+        }
+
+    // Form submission handler
+    // Upload image and get URL
+const uploadImage = async (file) => {
+  const formData = new FormData();
+  formData.append("photo", file);
+
+  const response = await fetch(`${Base_URL}/food/upload`, {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to upload image");
+  }
+
+  const data = await response.json();
+  return data.photoUrl;
+};
+
+// Form submission handler
+document.getElementById("addFoodForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const foodPhoto = document.getElementById("foodPhoto").files[0];
+  if (!foodPhoto) {
+    alert("Please upload a photo of the food");
+    return;
+  }
+
+  try {
+    // Upload the image and get the URL
+    const photoUrl = await uploadImage(foodPhoto);
+
+    // Submit the form data with the photo URL
+    const formData = {
+      foodType: document.getElementById("foodType").value,
+      quantity: document.getElementById("quantity").value,
+      location: document.getElementById("location").value,
+      expiry: document.getElementById("expiry").value,
+      price: document.getElementById("price").value,
+      condition: document.getElementById("foodCondition").value,
+      photo: photoUrl // Include the photo URL
+    };
+
+    const response = await fetch(`${Base_URL}/food/add`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("Token")}`
+      },
+      body: JSON.stringify(formData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to add listing");
+    }
+
+    // Clear form and refresh listings
+    e.target.reset();
+    fetchProviderListings();
+    alert("Listing added successfully!");
+  } catch (error) {
+    console.error("Submission error:", error);
+    alert(`Error: ${error.message}`);
+  }
+});
+
+    // Delete listing
+    window.deleteListing = async (listingId) => {
+    if (!confirm("Are you sure you want to delete this listing?")) return;
+
+    try {
+        const response = await fetch(`${Base_URL}/food/delete/${listingId}`, {
+        method: "DELETE",
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem("Token")}`,
+        },
+        });
+
+        if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete listing");
+        }
+
+        // Refresh the listings after deletion
+        fetchProviderListings();
+        alert("Listing deleted successfully!");
+    } catch (error) {
+        console.error("Deletion error:", error);
+        alert(`Error: ${error.message}`);
+    }
+    };
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!localStorage.getItem('Token')) {
+        window.location.href = 'login.html';
+      }
+      fetchProviderListings();
+    });
+
+    // Logout handler
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.clear();
+      window.location.href = 'login.html';
+    });
+  </script>
+</body>
+</html>

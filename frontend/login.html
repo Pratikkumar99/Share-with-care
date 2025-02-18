@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ShareWithCare - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      .auth-container {
+        min-height: 80vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .error-msg {
+        color: red;
+        font-size: 14px;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation Header -->
+    <div class="container">
+      <header class="d-flex flex-wrap align-items-center justify-content-between py-3 mb-4 border-bottom">
+        <a href="/" class="text-decoration-none">
+          <h3 class="text-primary">ShareWithCare</h3>
+        </a>
+        <ul class="nav col-12 col-md-auto mb-2 justify-content-center mb-md-0">
+          <nav>
+            <a href="index.html" class="nav-link d-inline px-3">Home</a>
+            <a href="how2work.html" class="nav-link d-inline px-3">How It Works</a>
+            <a href="login.html" class="nav-link d-inline px-3 link-secondary">Donate/Recieve Surplus</a>
+          </nav>
+        </ul>
+      </header>
+    </div>
+
+    <!-- Login & Signup Card -->
+    <div class="container auth-container">
+      <div class="card shadow-lg p-4" style="width: 400px;">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" id="authTabs">
+          <li class="nav-item">
+            <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login">Login</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" id="signup-tab" data-bs-toggle="tab" data-bs-target="#signup">Sign Up</button>
+          </li>
+        </ul>
+
+        <!-- Tabs Content -->
+        <div class="tab-content">
+          <!-- Login Form -->
+          <div class="tab-pane fade show active" id="login">
+            <form id="loginForm">
+              <div class="mb-3">
+                <label for="loginEmail" class="form-label">Email address</label>
+                <input type="email" class="form-control" id="loginEmail" required>
+              </div>
+              <div class="mb-3">
+                <label for="loginPassword" class="form-label">Password</label>
+                <input type="password" class="form-control" id="loginPassword" required>
+              </div>
+              <div id="loginErrorMsg" class="error-msg"></div>
+              <button type="submit" class="btn btn-primary w-100">Login</button>
+            </form>
+          </div>
+
+          <!-- Signup Form -->
+          <div class="tab-pane fade" id="signup">
+            <form id="signupForm">
+              <div class="mb-3">
+                <label for="signupName" class="form-label">Full Name</label>
+                <input type="text" class="form-control" id="signupName" required>
+              </div>
+              <div class="mb-3">
+                <label for="signupMob" class="form-label">Mobile Number</label>
+                <input type="text" class="form-control" id="signupMob" required>
+              </div>
+              <div class="mb-3">
+                <label for="signupEmail" class="form-label">Email address</label>
+                <input type="email" class="form-control" id="signupEmail" required>
+              </div>
+              <div class="mb-3">
+                <label for="signupPassword" class="form-label">Password</label>
+                <input type="password" class="form-control" id="signupPassword" required minlength="6">
+              </div>
+              <div class="mb-3">
+                <label for="signupRole" class="form-label">Role</label>
+                <select class="form-control" id="signupRole" required>
+                  <option value="provider">Provider (Hotel/Restaurant)</option>
+                  <option value="ngo">NGO/Food Bank</option>
+                </select>
+              </div>
+              <div id="signupErrorMsg" class="error-msg"></div>
+              <button type="submit" class="btn btn-success w-100">Sign Up</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="container">
+      <footer class="py-4 border-top text-center">
+        <p>© 2024 ShareWithCare, All rights reserved.</p>
+      </footer>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+      const Base_URL = 'http://localhost:4000'; // Backend API URL
+
+      // Login Form Submission
+      document.getElementById("loginForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const loginErrorMsg = document.getElementById('loginErrorMsg');
+        loginErrorMsg.textContent = ""; // Clear previous errors
+
+        try {
+          const response = await fetch(`${Base_URL}/user/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            localStorage.setItem("Token", data.token);
+            localStorage.setItem("Role", data.role); // Store role
+            alert("Login successful! Redirecting...");
+
+            // Redirect based on role
+            if (data.role === "provider") {
+              window.location.href = "provider-dashboard.html";
+            } else if (data.role === "ngo") {
+              window.location.href = "ngo-dashboard.html";
+            }
+          } else {
+            loginErrorMsg.textContent = data.message || "Invalid credentials. Try again.";
+          }
+        } catch (error) {
+          loginErrorMsg.textContent = "Network error. Please try again later.";
+        }
+      });
+
+      // Signup Form Submission
+      document.getElementById("signupForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const signupErrorMsg = document.getElementById('signupErrorMsg');
+        signupErrorMsg.textContent = ""; // Clear errors
+
+        const userData = {
+          name: document.getElementById('signupName').value,
+          mobile: document.getElementById('signupMob').value,
+          email: document.getElementById('signupEmail').value,
+          password: document.getElementById('signupPassword').value,
+          role: document.getElementById('signupRole').value
+        };
+
+        if (userData.password.length < 6) {
+          signupErrorMsg.textContent = "Password must be at least 6 characters long.";
+          return;
+        }
+
+        try {
+          const response = await fetch(`${Base_URL}/user/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(userData)
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            localStorage.setItem("Token", data.token);
+            localStorage.setItem("Role", data.role); // Store role
+            alert("Signup successful! Redirecting...");
+
+            // Redirect based on role
+            if (data.role === "provider") {
+              window.location.href = "provider-dashboard.html";
+            } else if (data.role === "ngo") {
+              window.location.href = "ngo-dashboard.html";
+            }
+          } else {
+            signupErrorMsg.textContent = data.message || "Signup failed. Try again.";
+          }
+        } catch (error) {
+          signupErrorMsg.textContent = "Network error. Please try again later.";
+        }
+      });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
