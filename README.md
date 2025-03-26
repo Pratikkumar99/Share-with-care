@@ -1,0 +1,1 @@
+Share with Care" is a web-based platform designed to reduce food waste and ensure surplus food reaches those in need. It connects restaurants, hotels, and messes with NGOs, allowing them to donate or sell excess food at minimal costs
