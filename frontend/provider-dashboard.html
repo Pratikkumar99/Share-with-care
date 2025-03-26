@@ -38,6 +38,37 @@
       padding: 1rem;
       margin-bottom: 2rem;
     }
+    /* AI Tracker Styles */
+    .ai-tracker {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      border-left: 4px solid var(--secondary-color);
+    }
+    .freshness-meter {
+      height: 10px;
+      border-radius: 5px;
+      background: #e9ecef;
+      margin: 0.5rem 0;
+      overflow: hidden;
+    }
+    .freshness-progress {
+      height: 100%;
+      background: linear-gradient(90deg, #2ecc71, #f1c40f);
+    }
+    .urgent-red {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    .warning-yellow {
+      color: #f1c40f;
+      font-weight: bold;
+    }
+    .safe-green {
+      color: #2ecc71;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -65,7 +96,7 @@
                 <input type="file" class="form-control" id="foodPhoto" accept="image/*" required>
               </div>
             <div class="col-md-3">
-              <label class="form-label">Food Type</label>
+              <label class="form-label">Food Description</label>
               <input type="text" class="form-control" id="foodType" required>
             </div>
             <div class="col-md-2">
@@ -77,7 +108,7 @@
               <input type="text" class="form-control" id="location" required>
             </div>
             <div class="col-md-2">
-              <label class="form-label">Time</label>
+              <label class="form-label">Expiry Time</label>
               <input type="datetime-local" class="form-control" id="expiry" required>
             </div>
             <div class="col-md-2">
@@ -135,6 +166,51 @@
       return new Date(dateString).toLocaleDateString('en-IN', options);
     };
 
+    // Calculate freshness percentage (demo logic)
+    const calculateFreshness = (expiryDate, condition) => {
+      const now = new Date();
+      const expiry = new Date(expiryDate);
+      const totalHours = (expiry - now) / (1000 * 60 * 60);
+      
+      // Base freshness on condition and time remaining
+      if (condition === "fresh") {
+        return Math.min(95, 70 + (totalHours / 24) * 5); // 70-95% for fresh items
+      } else if (condition === "frozen") {
+        return Math.min(85, 60 + (totalHours / 48) * 10); // 60-85% for frozen
+      } else {
+        return Math.max(20, Math.min(60, (totalHours / 12) * 20)); // 20-60% for expiring
+      }
+    };
+
+    // Get urgency status
+    const getUrgencyStatus = (expiryDate) => {
+      const now = new Date();
+      const expiry = new Date(expiryDate);
+      const hoursLeft = (expiry - now) / (1000 * 60 * 60);
+      
+      if (hoursLeft < 12) return "urgent";
+      if (hoursLeft < 24) return "warning";
+      return "safe";
+    };
+
+    // Format time remaining
+    const formatTimeRemaining = (expiryDate) => {
+      const now = new Date();
+      const expiry = new Date(expiryDate);
+      const diff = expiry - now;
+      
+      if (diff <= 0) return "Expired";
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (hours > 24) {
+        const days = Math.floor(hours / 24);
+        return `${days} day${days !== 1 ? 's' : ''} remaining`;
+      }
+      return `${hours}h ${minutes}m remaining`;
+    };
+
     // Fetch provider's listings with error handling
     const fetchProviderListings = async () => {
       try {
@@ -164,150 +240,226 @@
 
     // Render listings with proper error handling
     const renderProviderListings = (listings) => {
-  listingsContainer.innerHTML = listings.map(listing => `
-    <div class="col">
-      <div class="card food-card h-100 position-relative">
-        <div class="condition-indicator condition-${listing.condition}"></div>
-        <div class="card-body">
-          ${listing.photo ? `<img src="${listing.photo}" class="card-img-top mb-3" alt="${listing.foodType}" style="height: 400px; background-size : contain; background-repeat : no-repeat;">` : ''}
-          <h5 class="card-title text-primary">${listing.foodType}</h5>
-          <div class="card-text">
-            <div class="mb-2">
-              <i class="fas fa-weight-hanging me-2"></i>
-              <strong>Quantity:</strong> ${listing.quantity}
-            </div>
-            <div class="mb-2">
-              <i class="${getConditionIcon(listing.condition)}"></i>
-              ${listing.condition.charAt(0).toUpperCase() + listing.condition.slice(1)}
-            </div>
-            <div class="mb-2">
-              <i class="fas fa-map-marker-alt me-2"></i>
-              <strong>Location:</strong> ${listing.location}
-            </div>
-            <div class="mb-2">
-              <i class="fas fa-clock me-2"></i>
-              <strong>Time:</strong> ${formatDate(listing.expiry)}
-            </div>
-            <div class="mb-3">
-              <i class="fas fa-rupee-sign me-2"></i>
-              <strong>Price:</strong> ₹${listing.price}
-            </div>
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="badge ${listing.status === "available" ? "bg-success" : "bg-secondary"}">
-                ${listing.status}
-              </span>
-              <button onclick="deleteListing('${listing._id}')" class="btn btn-danger btn-sm">
-                <i class="fas fa-trash me-1"></i>Delete
-              </button>
+      listingsContainer.innerHTML = listings.map(listing => {
+        const freshness = calculateFreshness(listing.expiry, listing.condition);
+        const urgencyStatus = getUrgencyStatus(listing.expiry);
+        const timeRemaining = formatTimeRemaining(listing.expiry);
+        
+        return `
+        <div class="col">
+          <div class="card food-card h-100 position-relative">
+            <div class="condition-indicator condition-${listing.condition}"></div>
+            <div class="card-body">
+              ${listing.photo ? `<img src="${listing.photo}" class="card-img-top mb-3" alt="${listing.foodType}" style="height: 180px; object-fit: cover;">` : ''}
+              <h5 class="card-title text-primary">${listing.foodType}</h5>
+              <div class="card-text">
+                <div class="mb-2">
+                  <i class="fas fa-weight-hanging me-2"></i>
+                  <strong>Quantity:</strong> ${listing.quantity}
+                </div>
+                <div class="mb-2">
+                  <i class="${getConditionIcon(listing.condition)}"></i>
+                  ${listing.condition.charAt(0).toUpperCase() + listing.condition.slice(1)}
+                </div>
+                <div class="mb-2">
+                  <i class="fas fa-map-marker-alt me-2"></i>
+                  <strong>Location:</strong> ${listing.location}
+                </div>
+                <div class="mb-2">
+                  <i class="fas fa-clock me-2"></i>
+                  <strong>Expiry:</strong> ${formatDate(listing.expiry)}
+                </div>
+                <div class="mb-3">
+                  <i class="fas fa-rupee-sign me-2"></i>
+                  <strong>Price:</strong> ₹${listing.price}
+                </div>
+                
+                <!-- AI Food Lifecycle Tracker (Initially Collapsed) -->
+                <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="toggleAITracker(this, '${listing._id}')">
+                  <i class="fas fa-robot me-1"></i> Check Food Freshness
+                </button>
+                
+                <div id="aiTracker-${listing._id}" class="ai-tracker" style="display:none;">
+                  <h6 class="text-secondary"><i class="fas fa-chart-line me-1"></i> AI Freshness Analysis</h6>
+                  <div class="d-flex justify-content-between">
+                    <span>Freshness: <strong>${Math.round(freshness)}%</strong></span>
+                    <span class="${urgencyStatus === 'urgent' ? 'urgent-red' : urgencyStatus === 'warning' ? 'warning-yellow' : 'safe-green'}">
+                      ${timeRemaining}
+                    </span>
+                  </div>
+                  <div class="freshness-meter mt-1 mb-2">
+                    <div class="freshness-progress" style="width: ${freshness}%"></div>
+                  </div>
+                  <div class="small text-muted mb-2">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    ${getAITip(listing.condition, urgencyStatus)}
+                  </div>
+                  <button class="btn btn-sm btn-success w-100" onclick="requestPickup('${listing._id}')">
+                    <i class="fas fa-truck me-1"></i> Request Immediate Pickup
+                  </button>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                  <span class="badge ${listing.status === "available" ? "bg-success" : "bg-secondary"}">
+                    ${listing.status}
+                  </span>
+                  <button onclick="deleteListing('${listing._id}')" class="btn btn-danger btn-sm">
+                    <i class="fas fa-trash me-1"></i>Delete
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  `).join("");
-};
-        function getConditionIcon(condition) {
-            switch (condition) {
-                case "fresh": return "fas fa-leaf text-success"; // Green
-                case "frozen": return "fas fa-snowflake text-primary"; // Blue
-                case "expiring": return "fas fa-exclamation-triangle text-warning"; // Yellow
-                default: return "fas fa-question-circle text-secondary"; // Gray (Unknown)
-            }
-        }
-
-    // Form submission handler
-    // Upload image and get URL
-const uploadImage = async (file) => {
-  const formData = new FormData();
-  formData.append("photo", file);
-
-  const response = await fetch(`${Base_URL}/food/upload`, {
-    method: "POST",
-    body: formData
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to upload image");
-  }
-
-  const data = await response.json();
-  return data.photoUrl;
-};
-
-// Form submission handler
-document.getElementById("addFoodForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const foodPhoto = document.getElementById("foodPhoto").files[0];
-  if (!foodPhoto) {
-    alert("Please upload a photo of the food");
-    return;
-  }
-
-  try {
-    // Upload the image and get the URL
-    const photoUrl = await uploadImage(foodPhoto);
-
-    // Submit the form data with the photo URL
-    const formData = {
-      foodType: document.getElementById("foodType").value,
-      quantity: document.getElementById("quantity").value,
-      location: document.getElementById("location").value,
-      expiry: document.getElementById("expiry").value,
-      price: document.getElementById("price").value,
-      condition: document.getElementById("foodCondition").value,
-      photo: photoUrl // Include the photo URL
+        `;
+      }).join("");
     };
 
-    const response = await fetch(`${Base_URL}/food/add`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("Token")}`
-      },
-      body: JSON.stringify(formData)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to add listing");
+    function getConditionIcon(condition) {
+      switch (condition) {
+        case "fresh": return "fas fa-leaf text-success";
+        case "frozen": return "fas fa-snowflake text-primary";
+        case "expiring": return "fas fa-exclamation-triangle text-warning";
+        default: return "fas fa-question-circle text-secondary";
+      }
     }
 
-    // Clear form and refresh listings
-    e.target.reset();
-    fetchProviderListings();
-    alert("Listing added successfully!");
-  } catch (error) {
-    console.error("Submission error:", error);
-    alert(`Error: ${error.message}`);
-  }
-});
+    function getAITip(condition, urgencyStatus) {
+      if (urgencyStatus === "urgent") {
+        return "Urgent! Donate within 12 hours to prevent waste";
+      } else if (condition === "frozen") {
+        return "Frozen items maintain quality longer - consider donating soon";
+      } else {
+        return "Ideal for donation - NGOs will be notified automatically";
+      }
+    }
 
-    // Delete listing
-    window.deleteListing = async (listingId) => {
-    if (!confirm("Are you sure you want to delete this listing?")) return;
+    // Toggle AI Tracker visibility
+    window.toggleAITracker = (button, listingId) => {
+      const tracker = document.getElementById(`aiTracker-${listingId}`);
+      const isVisible = tracker.style.display === "block";
+      
+      tracker.style.display = isVisible ? "none" : "block";
+      button.innerHTML = isVisible 
+        ? `<i class="fas fa-robot me-1"></i> Check Food Freshness` 
+        : `<i class="fas fa-eye-slash me-1"></i> Hide Analysis`;
+    };
 
-    try {
-        const response = await fetch(`${Base_URL}/food/delete/${listingId}`, {
-        method: "DELETE",
-        headers: {
+    // Request Pickup handler
+    window.requestPickup = async (listingId) => {
+      try {
+        const response = await fetch(`${Base_URL}/food/request-pickup/${listingId}`, {
+          method: "POST",
+          headers: {
             Authorization: `Bearer ${localStorage.getItem("Token")}`,
-        },
+          },
         });
 
         if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete listing");
+          throw new Error("Failed to request pickup");
+        }
+
+        alert("Pickup requested successfully! NGOs will be notified.");
+        fetchProviderListings();
+      } catch (error) {
+        console.error("Pickup error:", error);
+        alert(`Error: ${error.message}`);
+      }
+    };
+
+    // Upload image and get URL
+    const uploadImage = async (file) => {
+      const formData = new FormData();
+      formData.append("photo", file);
+
+      const response = await fetch(`${Base_URL}/food/upload`, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload image");
+      }
+
+      const data = await response.json();
+      return data.photoUrl;
+    };
+
+    // Form submission handler
+    document.getElementById("addFoodForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const foodPhoto = document.getElementById("foodPhoto").files[0];
+      if (!foodPhoto) {
+        alert("Please upload a photo of the food");
+        return;
+      }
+
+      try {
+        // Upload the image and get the URL
+        const photoUrl = await uploadImage(foodPhoto);
+
+        // Submit the form data with the photo URL
+        const formData = {
+          foodType: document.getElementById("foodType").value,
+          quantity: document.getElementById("quantity").value,
+          location: document.getElementById("location").value,
+          expiry: document.getElementById("expiry").value,
+          price: document.getElementById("price").value,
+          condition: document.getElementById("foodCondition").value,
+          photo: photoUrl
+        };
+
+        const response = await fetch(`${Base_URL}/food/add`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("Token")}`
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to add listing");
+        }
+
+        // Clear form and refresh listings
+        e.target.reset();
+        fetchProviderListings();
+        alert("Listing added successfully!");
+      } catch (error) {
+        console.error("Submission error:", error);
+        alert(`Error: ${error.message}`);
+      }
+    });
+
+    // Delete listing
+    window.deleteListing = async (listingId) => {
+      if (!confirm("Are you sure you want to delete this listing?")) return;
+
+      try {
+        const response = await fetch(`${Base_URL}/food/delete/${listingId}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("Token")}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to delete listing");
         }
 
         // Refresh the listings after deletion
         fetchProviderListings();
         alert("Listing deleted successfully!");
-    } catch (error) {
+      } catch (error) {
         console.error("Deletion error:", error);
         alert(`Error: ${error.message}`);
-    }
+      }
     };
+
     // Initial load
     document.addEventListener('DOMContentLoaded', () => {
       if (!localStorage.getItem('Token')) {
